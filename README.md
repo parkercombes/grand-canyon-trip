@@ -2,7 +2,9 @@
 
 An interactive map of a four-day road trip, Oct 4–7, 2026. It starts and ends in Las Vegas and covers Valley of Fire, the Grand Canyon North Rim, Coral Pink Sand Dunes, Four Corners, Monument Valley and Upper Antelope Canyon.
 
-Published as a Claude artifact: https://claude.ai/artifact/3bULgNb34SAS4Qeo1ETo7V (private; use the page's Share menu to give people access).
+**Live map:** https://parkercombes.github.io/grand-canyon-trip/
+
+Also published as a Claude artifact: https://claude.ai/artifact/3bULgNb34SAS4Qeo1ETo7V (private; use the page's Share menu to give people access).
 
 ## The itinerary
 
