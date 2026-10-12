@@ -80,6 +80,21 @@ button:focus-visible, .day:focus-visible { outline: 2px solid var(--accent); out
 .leaflet-container { font-family: var(--body); }
 .leaflet-control-attribution { font-size: 10px; }
 
+/* photos: strip in each stop popup, full-size lightbox on click */
+.leaflet-popup-content .shots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; width: 260px; }
+.shots button { padding: 0; border: 0; background: #ddd6cc; cursor: zoom-in; border-radius: 4px; overflow: hidden; aspect-ratio: 1; }
+.shots button:first-child { grid-column: 1 / -1; aspect-ratio: 16 / 10; }
+.shots img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lightbox { position: fixed; inset: 0; z-index: 2000; background: rgba(12,10,9,.92); display: none; grid-template-rows: 1fr auto; padding: 16px; }
+.lightbox.open { display: grid; }
+.lightbox img { max-width: 100%; max-height: 100%; margin: auto; object-fit: contain; min-height: 0; border-radius: 4px; }
+.lightbox .bar { display: flex; align-items: center; gap: 10px; color: #eee8e1; padding-top: 12px; }
+.lightbox .cap { flex: 1; min-width: 0; font-size: 13px; }
+.lightbox .cap b { font-family: var(--display); font-size: 17px; margin-right: 8px; }
+.lightbox button { font: inherit; font-size: 13px; background: rgba(255,255,255,.12); color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.lightbox button:hover { background: rgba(255,255,255,.22); }
+.lightbox button:focus-visible { outline: 2px solid #e07a5c; outline-offset: 2px; }
+
 @media (max-width: 760px) {
   .app { grid-template-columns: 1fr; grid-template-rows: 58vh auto; height: auto; }
   #map { height: 58vh; }
@@ -112,6 +127,15 @@ button:focus-visible, .day:focus-visible { outline: 2px solid var(--accent); out
   </aside>
   <div id="map" role="region" aria-label="Trip map"></div>
 </div>
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
+  <img id="lb-img" alt="">
+  <div class="bar">
+    <div class="cap" id="lb-cap"></div>
+    <button id="lb-prev" aria-label="Previous photo">‹ Prev</button>
+    <button id="lb-next" aria-label="Next photo">Next ›</button>
+    <button id="lb-close" aria-label="Close photo viewer">Close</button>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -131,6 +155,9 @@ const PLACES = {
   antelope: { name: "Upper Antelope Canyon", where: "Page, AZ · guided tour" },
   waldorf:  { name: "Waldorf Astoria Las Vegas", where: "Las Vegas, NV", hotel: true },
 };
+
+// photos per stop, picked by geotag: photos/<key>-<n>.jpg, thumbnails in photos/thumbs/
+const PHOTOS = {"vof": 5, "imperial": 5, "royal": 5, "dunes": 5, "antelope": 5, "kanab": 2, "fourc": 2, "kayenta": 1, "view": 5, "waldorf": 1};
 
 const DAYS = [
   { n: 1, date: "Sun, Oct 4", note: "Zion was closed, so the route ran I‑15 to Hurricane, then Colorado City and Fredonia.", title: "Las Vegas to Kanab by way of Valley of Fire", stops: ["polo", "vof", "kanab"] },
@@ -190,6 +217,36 @@ TRIP.segments.forEach(s => {
   bounds[s.day] = (bounds[s.day] || L.latLngBounds(s.line)).extend(L.latLngBounds(s.line));
 });
 
+// ---------- photos ----------
+const shotsHtml = k => !PHOTOS[k] ? "" : `<div class="shots">${Array.from({ length: PHOTOS[k] }, (_, i) =>
+  `<button data-k="${k}" data-i="${i}" aria-label="Open photo ${i + 1} of ${PHOTOS[k]}"><img src="photos/thumbs/${k}-${i + 1}.jpg" alt="" loading="lazy"></button>`).join("")}</div>`;
+const lb = document.getElementById("lightbox"), lbImg = document.getElementById("lb-img");
+let lbK = null, lbI = 0, lbReturn = null;
+function showPhoto(k, i) {
+  lbK = k; lbI = (i + PHOTOS[k]) % PHOTOS[k];
+  lbImg.src = `photos/${k}-${lbI + 1}.jpg`;
+  lbImg.alt = `${PLACES[k].name}, photo ${lbI + 1}`;
+  document.getElementById("lb-cap").innerHTML = `<b>${PLACES[k].name}</b>${lbI + 1} of ${PHOTOS[k]}`;
+  const many = PHOTOS[k] > 1;
+  document.getElementById("lb-prev").hidden = document.getElementById("lb-next").hidden = !many;
+  if (!lb.classList.contains("open")) { lbReturn = document.activeElement; lb.classList.add("open"); document.getElementById("lb-close").focus(); }
+}
+function closePhoto() { lb.classList.remove("open"); lbImg.removeAttribute("src"); lbReturn?.focus?.(); }
+document.getElementById("lb-prev").onclick = () => showPhoto(lbK, lbI - 1);
+document.getElementById("lb-next").onclick = () => showPhoto(lbK, lbI + 1);
+document.getElementById("lb-close").onclick = closePhoto;
+lb.addEventListener("click", e => { if (e.target === lb) closePhoto(); });
+document.addEventListener("keydown", e => {
+  if (!lb.classList.contains("open")) return;
+  if (e.key === "Escape") closePhoto();
+  else if (e.key === "ArrowLeft") showPhoto(lbK, lbI - 1);
+  else if (e.key === "ArrowRight") showPhoto(lbK, lbI + 1);
+});
+document.getElementById("map").addEventListener("click", e => {
+  const b = e.target.closest(".shots button");
+  if (b) showPhoto(b.dataset.k, +b.dataset.i);
+});
+
 // stops: place each pin once per day it belongs to, hotels keep their own symbol
 const placedPerDay = {};
 TRIP.segments.forEach(s => {
@@ -199,7 +256,7 @@ TRIP.segments.forEach(s => {
     const p = PLACES[k], ll = TRIP.points[k];
     const icon = L.divIcon({ className: "", html: `<div class="pin${p.hotel ? " hotel" : ""}" style="--c:${dayColor(s.day)}"></div>`, iconSize: p.hotel ? [16, 16] : [14, 14] });
     L.marker(ll, { icon, title: p.name, zIndexOffset: p.hotel ? 0 : 100 })
-      .bindPopup(`<b>${p.name}</b><span class="k">${p.where}</span><br><span class="k">Day ${s.day}</span>`)
+      .bindPopup(`<b>${p.name}</b><span class="k">${p.where}</span><br><span class="k">Day ${s.day}</span>${shotsHtml(k)}`, { maxWidth: 300 })
       .addTo(groups[s.day]);
   });
 });

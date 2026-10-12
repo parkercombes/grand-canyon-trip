@@ -27,6 +27,9 @@ Zion was closed, so the drives between Las Vegas and Kanab go I‑15 to Hurrican
 | `scripts/routes.py` | Rebuilds `data/trip.json` from the stop list using the public OSRM router. |
 | `scripts/tiles.py` | Downloads USGS tiles around the routes and rebuilds `tiles/`. |
 | `scripts/inline_trip.py` | Copies `data/trip.json` into `index.html`. |
+| `photos/` | Up to five trip photos per stop (1600px), with 360px thumbnails in `photos/thumbs/`. Metadata and GPS are stripped. |
+| `data/photo-picks.json` | Which original photo files go with each stop. |
+| `scripts/photos.py` | Rebuilds `photos/` from exported originals and updates `PHOTOS` in `index.html`. |
 
 ## View it locally
 
@@ -46,6 +49,18 @@ Then open http://127.0.0.1:8765.
 4. Update the stop lists, dates and notes in the `DAYS` and `PLACES` constants in `index.html` to match.
 
 Routes are the most likely roads between stops, not GPS tracks. Mileage and drive times don't include stops or traffic.
+
+## Photos
+
+Click a stop on the map to see its photos, then click one to view it full size (arrow keys page through, Esc closes).
+
+Photos were matched to stops by their geotags (nearest stop within 15 km), and only shots with no people in them were kept. Some stops have fewer than five because few photos were taken there. Polo Towers and the North Rim Visitor Center have none.
+
+To change the picks, export the originals from Photos (File › Export › Export Unmodified Originals), edit `data/photo-picks.json`, then run:
+
+```bash
+python3 scripts/photos.py <export-folder> data/photo-picks.json
+```
 
 ## Credits
 
